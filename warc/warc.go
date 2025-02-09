@@ -1,4 +1,5 @@
 package warc
+
 /*
 	Copyright (C) 2015  Wolfgang Meyers
 
@@ -20,16 +21,19 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
-//	"crypto/sha1"
-//	"encoding/hex"
+
+	//	"crypto/sha1"
+	//	"encoding/hex"
 	"errors"
 	"fmt"
-//	"github.com/nu7hatch/gouuid" // needed for read/write
+
+	//	"github.com/nu7hatch/gouuid" // needed for read/write
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
-//	"time" // needed for read/write
+
+	//	"time" // needed for read/write
 	"github.com/wolfgangmeyers/go-warc/warc/utils"
 )
 
@@ -54,38 +58,39 @@ var KNOWN_HEADERS map[string]string = map[string]string{
 
 var RE_VERSION *regexp.Regexp = regexp.MustCompile("WARC/(\\d+.\\d+)\r\n")
 var RE_HEADER *regexp.Regexp = regexp.MustCompile("([a-zA-Z_\\-]+): *(.*)\r\n")
-var SUPPORTED_VERSIONS map[string]bool = map[string]bool{"1.0": true}
+var SUPPORTED_VERSIONS map[string]bool = map[string]bool{"1.0": true, "1.1": true}
 
-//    The WARC Header object represents the headers of a WARC record.
-//    It provides dictionary like interface for accessing the headers.
+// The WARC Header object represents the headers of a WARC record.
+// It provides dictionary like interface for accessing the headers.
 //
-//    The following mandatory fields are accessible also as get/set methods.
+// The following mandatory fields are accessible also as get/set methods.
 //
-//        * h.GetRecordId() == h.Get('WARC-Record-ID')
-//        * h.GetContentLength() == h.Get("Content-Length") // converted to int
-//        * h.GetDate() == h.Get("WARC-Date")
-//        * h.GetType() == h.Get("WARC-Type")
+//   - h.GetRecordId() == h.Get('WARC-Record-ID')
+//   - h.GetContentLength() == h.Get("Content-Length") // converted to int
+//   - h.GetDate() == h.Get("WARC-Date")
+//   - h.GetType() == h.Get("WARC-Type")
 //
-//    :params headers: map[string]string of headers.
-//    :params defaults: If true, important headers like WARC-Record-ID,
-//                      WARC-Date, Content-Type and Content-Length are
-//                      initialized to automatically if not already present.
-//                      TODO: add this param back for read/write
+// :params headers: map[string]string of headers.
+// :params defaults: If true, important headers like WARC-Record-ID,
+//
+//	WARC-Date, Content-Type and Content-Length are
+//	initialized to automatically if not already present.
+//	TODO: add this param back for read/write
 type WARCHeader struct {
 	version string
 	*utils.CIStringMap
 }
 
 // TODO: restore 'defaults' arg for read/write
-func NewWARCHeader(headers map[string]string/*, defaults bool*/) *WARCHeader {
+func NewWARCHeader(headers map[string]string /*, defaults bool*/) *WARCHeader {
 	warcHeader := &WARCHeader{
 		"WARC/1.0",
 		utils.NewCIStringMap(),
 	}
 	warcHeader.Update(headers)
-//	if defaults {
-//		warcHeader.InitDefaults()
-//	}
+	//	if defaults {
+	//		warcHeader.InitDefaults()
+	//	}
 	return warcHeader
 }
 
@@ -185,7 +190,7 @@ func NewWARCRecord(header *WARCHeader, payload *utils.FilePart, headers map[stri
 	warcRecord := &WARCRecord{}
 	if header == nil {
 		// TODO: restore for read/write
-		header = NewWARCHeader(headers/*, true*/)
+		header = NewWARCHeader(headers /*, true*/)
 	}
 	warcRecord.header = header
 	warcRecord.payload = payload
@@ -254,8 +259,8 @@ func (wr *WARCRecord) GetPayload() *utils.FilePart {
 
 type WARCFile struct {
 	filehandle io.ReadCloser
-	filebuf *bufio.Reader
-	gzipfile   *gzip.Reader
+	filebuf    *bufio.Reader
+	gzipfile   io.Reader
 	reader     *WARCReader
 }
 
@@ -272,9 +277,22 @@ func NewWARCFile(reader io.ReadCloser) (*WARCFile, error) {
 	// keep a handle to underlying file so that it can be closed.
 	wf := &WARCFile{
 		filehandle: reader,
-		filebuf: filebuf,
+		filebuf:    filebuf,
 		gzipfile:   gzipfile,
 		reader:     NewWARCReader(filebuf, gzipfile),
+	}
+	return wf, nil
+}
+
+func NewRawWARCFile(reader io.ReadCloser) (*WARCFile, error) {
+	filebuf := bufio.NewReader(reader)
+
+	// keep a handle to underlying file so that it can be closed.
+	wf := &WARCFile{
+		filehandle: reader,
+		filebuf:    filebuf,
+		gzipfile:   filebuf,
+		reader:     NewWARCReader(filebuf, filebuf),
 	}
 	return wf, nil
 }
@@ -293,10 +311,10 @@ func (wf *WARCFile) Close() error {
 
 type WARCReader struct {
 	filehandle io.Reader
-	gzipfile   *gzip.Reader
+	gzipfile   io.Reader
 }
 
-func NewWARCReader(filehandle io.Reader, gzipfile *gzip.Reader) *WARCReader {
+func NewWARCReader(filehandle io.Reader, gzipfile io.Reader) *WARCReader {
 	warcReader := &WARCReader{
 		filehandle: filehandle,
 		gzipfile:   gzipfile,
@@ -321,7 +339,7 @@ func (wr *WARCReader) ReadHeader(reader *bufio.Reader) (*WARCHeader, error) {
 	headers := map[string]string{}
 	for {
 		line, err := reader.ReadString('\n')
-//		fmt.Println("*** header line - " + line)
+		//		fmt.Println("*** header line - " + line)
 		if err != nil {
 			return nil, err
 		}
@@ -336,13 +354,13 @@ func (wr *WARCReader) ReadHeader(reader *bufio.Reader) (*WARCHeader, error) {
 		headers[name] = value
 	}
 	// TODO: restore for read/write
-	return NewWARCHeader(headers/*, false*/), nil
+	return NewWARCHeader(headers /*, false*/), nil
 }
 
 func (wr *WARCReader) Expect(reader *bufio.Reader, expectedLine string, message string) error {
 	line, err := reader.ReadString('\n')
 	if err != nil {
-//		fmt.Println(err)
+		//		fmt.Println(err)
 		return err
 	}
 	if line != expectedLine {
@@ -357,7 +375,7 @@ func (wr *WARCReader) Expect(reader *bufio.Reader, expectedLine string, message 
 func (wr *WARCReader) ReadRecord() (*WARCRecord, error) {
 	reader := bufio.NewReader(wr.gzipfile)
 	header, err := wr.ReadHeader(reader)
-	
+
 	if err != nil && strings.Index(err.Error(), "EOF") > -1 {
 		return nil, errors.New("EOF")
 	}
@@ -371,12 +389,16 @@ func (wr *WARCReader) ReadRecord() (*WARCRecord, error) {
 	// consume the footer from the previous record
 	wr.Expect(reader, "\r\n", "")
 	wr.Expect(reader, "\r\n", "")
-	// the last call advances to the end of the gzip file
-	wr.Expect(reader, "\r\n", "")
-	// start reading the next record in the gzip file
-	wr.gzipfile.Reset(wr.filehandle)
-	wr.gzipfile.Multistream(false)
-	
+
+	if gzipfile, e := wr.gzipfile.(*gzip.Reader); e {
+		// the last call advances to the end of the gzip file
+		wr.Expect(reader, "\r\n", "")
+
+		// start reading the next record in the gzip file
+		gzipfile.Reset(wr.filehandle)
+		gzipfile.Multistream(false)
+	}
+
 	if err != nil {
 		return nil, err
 	}
